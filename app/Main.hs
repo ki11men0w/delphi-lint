@@ -58,11 +58,21 @@ opts' = getProgName >>= \programName -> return $
              ,"usage: " ++ programName ++ " OPTIONS DIR_WITH_YOUR_DELPHI_PROJECT"
              ]
 
+
+fileNameCompOpts = defaultCompOpt {
+                     -- Case insensitive because Delphi is for windows and there file
+                     -- names are case insensitive.
+                     caseSensitive = False
+                   }
+fileNameExecOpts = defaultExecOpt
+-- | Compile regex for matching file name
+makeFileNameRegexM = makeRegexOptsM fileNameCompOpts fileNameExecOpts
+
 checkOptions :: Flags -> IO ()
 checkOptions opts = do
 
   let badRegexps = filter (isLeft . snd) $
-                   map (\x -> (x,(compile defaultCompOpt defaultExecOpt x))) $
+                   map (\x -> (x,(makeFileNameRegexM x))) $
                        ignore_path_pattern opts
   when (not . null $ badRegexps) $
        let firstElem = head badRegexps
@@ -79,7 +89,9 @@ main = do
   opts'' <- cmdArgs =<< opts'
   let
     ignorePath :: FilePath -> Bool
-    ignorePath path = or $ map (\pat -> path =~ pat :: Bool) $ ignore_path_pattern opts''
+    ignorePath path =
+      or $ map (`matchTest` path) compiledRegexps
+        where compiledRegexps = rights $ map makeFileNameRegexM $ ignore_path_pattern opts''
 
   checkOptions opts''
   --print $ ignore_path_pattern opts''
