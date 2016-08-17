@@ -9,7 +9,7 @@ import System.Environment (getArgs)
 import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
 import System.FilePath (takeFileName, takeExtension)
-import CheckDfm.NonAsciiInSql
+import Checks.DfmNonAsciiInSql
 import System.IO (stdout, stderr, hPutStrLn)
 import System.Console.CmdArgs
 import System.Environment

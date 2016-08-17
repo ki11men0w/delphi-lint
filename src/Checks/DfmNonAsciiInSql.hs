@@ -1,6 +1,6 @@
 {- -*- coding:utf-8 -*- -}
 
-module CheckDfm.NonAsciiInSql
+module Checks.DfmNonAsciiInSql
   (
    checkDfmForNonAsciiSymbolsInSql
   ) where
