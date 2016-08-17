@@ -89,7 +89,7 @@ checkSql s =
              Left e -> False
              Right x -> True
 
-parseHasSql :: Parser  ()
+parseHasSql :: Parsec String () ()
 parseHasSql =
   () <$ try sqlMarkerAtBegin <|> () <$ manyTill anyChar sqlMarkerInbetween
   where

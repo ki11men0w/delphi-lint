@@ -93,18 +93,12 @@ main = do
 -- необходимо поправить. Если при обработке файла произошла ошибка, то её текст будет
 checkDfmFile :: Flags -> FilePath -> IO (Either String (Maybe String))
 checkDfmFile opts file = do
-  input <- readFile file
-  if not $ isTextDfm input
-    then
-      if ignore_binary_dfm opts
-        then return $ Right Nothing
-        else return $ Left $ "not text DFM"
-    else do
-      let parsedDfm = parseDfmFile file input
-      --print parsedDfm
-      return $ case parsedDfm of
-                 Left e -> Left $ show e
-                 Right o -> Right $ checkDfmForNonAsciiSymbolsInSql o
+  parsedDfm <- parseDfmFile file (ParseDfmOpts{ignoreBinaryDfm = ignore_binary_dfm opts})
+  --print parsedDfm
+  return $ case parsedDfm of
+             Left e -> Left $ show e
+             Right (Just o) -> Right $ checkDfmForNonAsciiSymbolsInSql o
+             _  -> Right Nothing
 
 
 printResults :: [(FilePath, Either String (Maybe String))] -> IO ()

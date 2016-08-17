@@ -1,6 +1,18 @@
 {- -*- coding:utf-8 -*- -}
 
-module Dfm where
+module Dfm (
+            -- * DFM representation
+            DfmFile
+           ,Object(..)
+           ,ObjectOrigin(..)
+           ,PropertyOfObject(..)
+           ,Property(..)
+           ,PropertyValue(..)
+           ,Item(..)
+           -- * Parsing functions
+           ,ParseDfmOpts(..)
+           ,parseDfmFile
+           ) where
 
 import Text.Parsec hiding ((<|>), many, optional)
 import Control.Monad
@@ -15,50 +27,66 @@ import Data.String (IsString(..))
 
 type DfmFile = Object
 
+-- | Object in DFM-file
 data Object = Object {
-    objectName :: String
-  , objectType :: String
-  , objectSource :: ObjectSource
-  , objectExtraOptions :: Maybe String
-  , objectProperties :: [PropertyOfObject]
+    objectName :: String -- ^ Object name
+  , objectType :: String -- ^ Object type
+  , objectOrigin :: ObjectOrigin -- ^ How object declared: object, inherited or inline
+  , objectExtraOptions :: Maybe String -- ^ Extra declarations that following declaration of object at the same line.
+                                       -- I don't now what these declarations mean. For example @__[2]__@ in:
+                                       --
+                                       -- @
+                                       --   object frmMain: TForm __[2]__
+                                       --     Left = 20
+                                       --     Top = 100
+                                       --   ...
+                                       -- @
+                                       --
+  , objectProperties :: [PropertyOfObject] -- ^ List of object properties
   } deriving (Show)
 
-data ObjectSource = Normal | Inherited | Inline deriving (Show)
-
+-- | Object origin type
+data ObjectOrigin = Normal | Inherited | Inline deriving (Show)
 
 objectS = "object"
 inheritedS = "inherited"
 inlineS = "inline"
-instance IsString ObjectSource where
+instance IsString ObjectOrigin where
   fromString inheritedS = Inherited
   fromString inlineS = Inline
   fromString _ = Normal
 
-data PropertyOfObject = PropertyO Object | PropertyP Property
+-- | Represent any object property 
+data PropertyOfObject
+  = PropertyO Object -- ^ Propety that is itself object
+  | PropertyP Property -- ^ Simple property of object
   deriving (Show)
 
+-- | Single simple property
 data Property = Property
   {
-    propertyName :: String
-  , propertyValue :: PropertyValue
+    propertyName :: String -- ^ Property name
+  , propertyValue :: PropertyValue -- ^ Property value
   }
   deriving (Show)
 
+-- | Represent value od a simple property
 data PropertyValue =
-      PVName String
-    | PVBoolean Bool
-    | PVInteger Integer
-    | PVString String
-    | PVList [String]
-    | PVStrings [String]
-    | PVBinary String
-    | PVSet [String]
-    | PVItems [Item]
+      PVConstant String -- ^ Constant property
+    | PVBoolean Bool -- ^ Boolean property
+    | PVInteger Integer -- ^ Integer property
+    | PVString String -- ^ String property
+    | PVList [String] -- ^ Property with list
+    | PVStrings [String] -- ^ TStrings property
+    | PVBinary String -- ^ Binary property
+    | PVSet [String] -- ^ Propertty with set of values
+    | PVItems [Item] -- ^ Property with @items@
   deriving (Show)
 
-
+-- | Representation of single @item@
 data Item = Item {itemProperties :: [PropertyOfObject]}
             deriving (Show)
+
 
 type Parser = Parsec String ()
 
@@ -68,11 +96,24 @@ traceM' label = return ()
 --   traceM $ label ++ ' ':x
 --   return ()
 
-parseDfmFile :: String -> String -> Either String Object
-parseDfmFile sourceName input =
-  case parse parseObject sourceName input of
-    Left e -> (Left . show) e
-    Right x -> Right x
+-- | Options of DFM parsing
+data ParseDfmOpts = ParseDfmOpts {
+    ignoreBinaryDfm :: Bool -- ^ Ignore not text DFM-files
+  }
+
+-- | Parse DFM file. Now we can parse only DFM-files in Text format.
+parseDfmFile :: FilePath -> ParseDfmOpts -> IO (Either String (Maybe Object))
+parseDfmFile file opts = do
+  input <- readFile file
+  return $ if not $ isTextDfm input
+    then
+      if ignoreBinaryDfm opts
+        then Right Nothing
+        else Left $ "not text DFM"
+    else
+      case parse parseObject file input of
+        Left e -> (Left . show) e
+        Right x -> Right $ Just x
 
 isTextDfm :: String -> Bool
 isTextDfm s =
@@ -143,7 +184,7 @@ parseProperty = do
 parsePropertyValue = do
   traceM' "parsePropertyValue ["
   value <- between skipSpaces' spacesTillEol $
-           parseSet <|> parseList <|> parseBinary <|> parseItems <|> try parseInteger <|> try parseBoolean <|> try parseString <|>  parseName
+           parseSet <|> parseList <|> parseBinary <|> parseItems <|> try parseInteger <|> try parseBoolean <|> try parseString <|> parseConstant
   traceM' "parsePropertyValue ]"
   return value
                                  
@@ -229,11 +270,11 @@ parseBinary = do
   traceM' "parseBinary ]"
   return value
 
-parseName :: Parser PropertyValue
-parseName = do
-  traceM' "parseName ["
-  value <- fmap PVName $ notSpaces
-  traceM' "parseName ]"
+parseConstant :: Parser PropertyValue
+parseConstant = do
+  traceM' "parseConstant ["
+  value <- fmap PVConstant $ notSpaces
+  traceM' "parseConstant ]"
   return value
 
 parseItems :: Parser PropertyValue
