@@ -6,14 +6,11 @@ module Checks.DfmNonAsciiInSql
   ) where
 
 import Dfm
-import Control.Monad.Trans.State
-import Control.Monad (when)
+import Control.Monad.Trans.State (State, execState, get, put)
 import Data.List (intercalate)
 import ParsecUtils
 import Text.Parsec hiding ((<|>), many, optional, State)
 import Control.Applicative
-import Data.Maybe (isJust)
-import Data.List (isPrefixOf)
 import Data.Char (toLower)
 
 data StateData = StateData
@@ -22,6 +19,7 @@ data StateData = StateData
   } deriving (Show)
 
 
+-- | Check DFM for non ASCII symbols in probably SQL's
 checkDfmForNonAsciiSymbolsInSql :: DfmFile -> Maybe String
 checkDfmForNonAsciiSymbolsInSql dfm =
   let msgs = messages $ execState (checkObject dfm []) $ StateData []

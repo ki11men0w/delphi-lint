@@ -33,7 +33,7 @@ executable delphi-lint
   build-depends:       base
                      , filepath
                      , cmdargs >= 0.10.14
-                     , regex-tdfa >= 1.2.2
+                     , regex-tdfa
                      , directory
                      , delphi-lint
   default-language:    Haskell2010

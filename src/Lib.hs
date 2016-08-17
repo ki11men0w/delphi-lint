@@ -11,11 +11,9 @@ module Lib
     , isDir
     ) where
 
-import Data.Foldable (traverse_)
 import System.Directory.Tree (
-                              AnchoredDirTree(..),
+                              AnchoredDirTree( (:/) ),
                               DirTree(..),
-                              FileName,
                               filterDir,
                               readDirectoryWith,
                              )

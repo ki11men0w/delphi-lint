@@ -5,20 +5,14 @@ module Main where
 
 import Lib
 import Dfm
-import System.Environment (getArgs)
-import Data.Foldable (traverse_)
-import Data.Traversable (traverse)
-import System.FilePath (takeFileName, takeExtension)
 import Checks.DfmNonAsciiInSql
 import System.IO (stdout, stderr, hPutStrLn)
 import System.Console.CmdArgs
-import System.Environment
-import Control.Monad (when)
+import System.Environment (getProgName)
+import Control.Monad (when, forM_)
 import Text.Regex.TDFA
-import Text.Regex.TDFA.String
 import Data.Either (isLeft, isRight, rights)
 import System.Directory (doesFileExist, doesDirectoryExist)
-import Data.Maybe (isJust)
 
 import Paths_delphi_lint (version)
 import Data.Version (showVersion)
@@ -99,15 +93,13 @@ checkOptions opts = do
 main :: IO ()
 main = do
   opts'' <- cmdArgs =<< opts'
+  checkOptions opts''
   let
     ignorePath :: FilePath -> Bool
     ignorePath path =
       or $ map (`matchTest` path) compiledRegexps
         where compiledRegexps = rights $ map makeFileNameRegexM $ ignore_path_pattern opts''
 
-  checkOptions opts''
-  --print $ ignore_path_pattern opts''
-  let dir = head $ sources_paths opts''
   files <- fmap concat $ mapM (findFiles filterDfmFiles) $ source_path_1 opts'' : sources_paths opts''
   mapM (\f -> ((,) f) <$> checkDfmFile opts'' f) (filter (not . ignorePath) files) >>= printResults
   return ()

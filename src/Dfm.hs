@@ -15,16 +15,16 @@ module Dfm (
            ) where
 
 import Text.Parsec hiding ((<|>), many, optional)
-import Control.Monad
 import Control.Applicative
 import ParsecUtils
 import Debug.Trace
 import Data.Maybe (fromMaybe)
-import Numeric (readHex)
-import Data.Char (chr, isSpace)
-import Data.List (intercalate, isPrefixOf)
+import Data.Char (chr)
+import Data.List (isPrefixOf)
 import Data.String (IsString(..))
 
+
+-- | DFM-file as a hole
 type DfmFile = Object
 
 -- | Object in DFM-file
