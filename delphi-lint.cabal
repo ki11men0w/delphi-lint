@@ -34,6 +34,7 @@ executable delphi-lint
                      , filepath
                      , cmdargs >= 0.10.14
                      , regex-tdfa >= 1.2.2
+                     , directory
                      , delphi-lint
   default-language:    Haskell2010
 

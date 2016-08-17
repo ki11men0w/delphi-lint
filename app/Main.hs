@@ -17,6 +17,7 @@ import Control.Monad (when)
 import Text.Regex.TDFA
 import Text.Regex.TDFA.String
 import Data.Either (isLeft, isRight, rights)
+import System.Directory (doesFileExist, doesDirectoryExist)
 import Data.Maybe (isJust)
 
 import Paths_delphi_lint (version)
@@ -88,6 +89,11 @@ checkOptions opts = do
                       Left x -> x
        in error $ "Bad regex \"" ++ (fst firstElem) ++ "\" in --ignore-path-pattern: " ++ errMsg
 
+  forM_ (source_path_1 opts : sources_paths opts) $ \path -> do
+    b <- (||) <$> doesFileExist path <*> doesDirectoryExist path
+    when (not b) $ hPutStrLn stderr $ "File or directory \"" ++ path ++ "\" does not exists"
+
+  return ()
 
 
 main :: IO ()
