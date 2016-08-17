@@ -29,7 +29,8 @@ programVersion =
 -- | Флаги коммандной строки
 data Flags = Flags
            {
-             sources_paths :: [String],
+             source_path_1 :: FilePath,
+             sources_paths :: [FilePath],
              ignore_path_pattern :: [String],
              ignore_binary_dfm :: Bool
            } deriving (Data, Typeable)
@@ -37,14 +38,19 @@ data Flags = Flags
 opts' :: IO Flags
 opts' = getProgName >>= \programName -> return $
         Flags {
+          source_path_1 =
+            def
+            &= argPos 0
+            &= typ "DIR_OR_FILE_1",
           sources_paths =
             def
             &= args
-            &= typ "DIR_WITH_DELPHI_PROJECT",
+            &= typ "DIR_OR_FILE_2 [DIR_OR_FILE_3 [...]]",
 
           ignore_path_pattern =
             def
-            &= help "Regex pattern of file names (with full path) to ignore",
+            &= typ "REGEX"
+            &= help "Regex pattern to ignore. It is applied to each file name with full path",
                
           ignore_binary_dfm =
             def
@@ -54,8 +60,10 @@ opts' = getProgName >>= \programName -> return $
         &= summary ("Lint for Delphi version " ++ programVersion)
         &= details
              [
-              "Check Delphi sources for common errors."
-             ,"usage: " ++ programName ++ " OPTIONS DIR_WITH_YOUR_DELPHI_PROJECT"
+              "Checks Delphi sources for common errors."
+             ,"Usage examples:"
+             ,programName ++ " --ignore-path-pattern=\"[\\]enu[\\]\" --ignore-path-pattern=\"[\\]dc[\\]\" .\\Source"
+             ,programName ++ " Unit1.dfm Unit2.dfm"
              ]
 
 
@@ -80,8 +88,6 @@ checkOptions opts = do
                       Left x -> x
        in error $ "Bad regex \"" ++ (fst firstElem) ++ "\" in --ignore-path-pattern: " ++ errMsg
 
-  when (null $ sources_paths opts) $
-       error "Directories with sources are not defined"
 
 
 main :: IO ()
@@ -96,7 +102,7 @@ main = do
   checkOptions opts''
   --print $ ignore_path_pattern opts''
   let dir = head $ sources_paths opts''
-  files <- fmap concat $ mapM  (findFiles filterDfmFiles) $ sources_paths opts''
+  files <- fmap concat $ mapM (findFiles filterDfmFiles) $ source_path_1 opts'' : sources_paths opts''
   mapM (\f -> ((,) f) <$> checkDfmFile opts'' f) (filter (not . ignorePath) files) >>= printResults
   return ()
 
