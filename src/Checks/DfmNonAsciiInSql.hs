@@ -12,8 +12,9 @@ import ParsecUtils
 import Text.Parsec hiding ((<|>), many, optional, State)
 import Control.Applicative
 import Data.Char (toLower)
+import Data.Functor (($>))
 
-data StateData = StateData
+newtype StateData = StateData
   {
     messages :: [String]
   } deriving (Show)
@@ -23,7 +24,7 @@ data StateData = StateData
 checkDfmForNonAsciiSymbolsInSql :: DfmFile -> Maybe String
 checkDfmForNonAsciiSymbolsInSql dfm =
   let msgs = messages $ execState (checkObject dfm []) $ StateData []
-  in if null (msgs)
+  in if null msgs
        then Nothing
        else Just $ intercalate "\n" msgs
 
@@ -32,8 +33,7 @@ checkDfmForNonAsciiSymbolsInSql dfm =
 -- объекта 'o'.
 checkObject :: Object -> [Object] -> State StateData ()
 checkObject o parents = do
-  mapM checkProperty $ objectProperties o
-  return ()
+  mapM_ checkProperty $ objectProperties o
    where
      checkProperty (PropertyO child) = checkObject child (o:parents)
      checkProperty (PropertyP p@(Property _ (PVString s))) = checkProp (makePropName'''' p o parents) s
@@ -72,14 +72,14 @@ makePropName''' object objects =
 
 makePropName'''' :: Property -> Object -> [Object] -> String
 makePropName'''' p o os =
-  makePropName $ propertyName p : (objectName o) : (map objectName os)
+  makePropName $ propertyName p : objectName o : map objectName os
 
 checkSql :: String -> Maybe String
 checkSql s =
   if hasNotAscii s && hasSql s then Just $ "Non ASCII symbols in probably SQL expression: \'" ++ filterNonAscii s ++ "'"  else Nothing
     where
       filterNonAscii = filter (not .isAscii)
-      hasNotAscii = any (not . isAscii)
+      hasNotAscii = not . all isAscii
       hasSql :: String -> Bool
       hasSql s =
         let parseResult = parse parseHasSql "string property value" $ map toLower s
@@ -93,5 +93,5 @@ parseHasSql =
   where
     notSqlIdentifierChar = satisfy (not . isSqlIdentifierChar)
     sqlMarker = string "select" <|> string "where" <|> string "from" <|> ((\_ _ -> "") <$> string "order" <* spaces1 <*> string "by")
-    sqlMarkerAtBegin = sqlMarker *> notSqlIdentifierChar *> pure ()
+    sqlMarkerAtBegin = sqlMarker *> notSqlIdentifierChar $> ()
     sqlMarkerInbetween = between notSqlIdentifierChar notSqlIdentifierChar sqlMarker

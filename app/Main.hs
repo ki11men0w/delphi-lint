@@ -1,5 +1,6 @@
 {-  -*- coding:utf-8 -*-  -}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 
 module Main where
 
@@ -9,7 +10,7 @@ import Checks.DfmNonAsciiInSql
 import System.IO (stdout, stderr, hPutStrLn)
 import System.Console.CmdArgs
 import System.Environment (getProgName)
-import Control.Monad (when, forM_)
+import Control.Monad (unless, forM_)
 import Text.Regex.TDFA
 import Data.Either (isLeft, isRight, rights)
 import System.Directory (doesFileExist, doesDirectoryExist)
@@ -75,19 +76,17 @@ checkOptions :: Flags -> IO ()
 checkOptions opts = do
 
   let badRegexps = filter (isLeft . snd) $
-                   map (\x -> (x,(makeFileNameRegexM x))) $
+                   map (\x -> (x, makeFileNameRegexM x)) $
                        ignore_path_pattern opts
-  when (not . null $ badRegexps) $
+  unless (null badRegexps) $
        let firstElem = head badRegexps
            errMsg = case snd firstElem of
                       Left x -> x
-       in error $ "Bad regex \"" ++ (fst firstElem) ++ "\" in --ignore-path-pattern: " ++ errMsg
+       in error $ "Bad regex \"" ++ fst firstElem ++ "\" in --ignore-path-pattern: " ++ errMsg
 
   forM_ (source_path_1 opts : sources_paths opts) $ \path -> do
     b <- (||) <$> doesFileExist path <*> doesDirectoryExist path
-    when (not b) $ hPutStrLn stderr $ "File or directory \"" ++ path ++ "\" does not exists"
-
-  return ()
+    unless b $ hPutStrLn stderr $ "File or directory \"" ++ path ++ "\" does not exists"
 
 
 main :: IO ()
@@ -97,11 +96,11 @@ main = do
   let
     ignorePath :: FilePath -> Bool
     ignorePath path =
-      or $ map (`matchTest` path) compiledRegexps
+      any (`matchTest` path) compiledRegexps
         where compiledRegexps = rights $ map makeFileNameRegexM $ ignore_path_pattern opts''
 
   files <- fmap concat $ mapM (findFiles filterDfmFiles) $ source_path_1 opts'' : sources_paths opts''
-  mapM (\f -> ((,) f) <$> checkDfmFile opts'' f) (filter (not . ignorePath) files) >>= printResults
+  mapM (\f -> (f,) <$> checkDfmFile opts'' f) (filter (not . ignorePath) files) >>= printResults
   return ()
 
 
@@ -118,10 +117,10 @@ checkDfmFile opts file = do
 
 
 printResults :: [(FilePath, Either String (Maybe String))] -> IO ()
-printResults results =
-  mapM_ printOneResult results
+printResults =
+  mapM_ printOneResult
   where
-    printOneResult ((fileName, Left msg)) = hPutStrLn stderr $ "Error while parsing file \"" ++ fileName ++ "\": " ++ msg
-    printOneResult ((fileName, Right (Just msg))) = hPutStrLn stdout $ "\n\nDFM-file \"" ++ fileName ++ "\" has issues:\n" ++ msg
+    printOneResult (fileName, Left msg) = hPutStrLn stderr $ "Error while parsing file \"" ++ fileName ++ "\": " ++ msg
+    printOneResult (fileName, Right (Just msg)) = putStrLn $ "\n\nDFM-file \"" ++ fileName ++ "\" has issues:\n" ++ msg
     printOneResult _ = return ()
   

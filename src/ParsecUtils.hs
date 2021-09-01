@@ -29,10 +29,9 @@ where
 
 import Text.Parsec
 import Text.Parsec.String
-import Data.Char (toUpper, toLower, isSpace)
+import Data.Char (toUpper, toLower, isSpace, isAlphaNum)
 import Control.Monad (void)
 import Data.Monoid
-import Data.Char (isAlphaNum)
 
 
 type CharParser st = GenParser Char st
@@ -106,12 +105,12 @@ spaces1 = space >> spaces
 
 -- | Пропускает все пробелы. Только пробелы: другие пробельные символы не учитываются.
 skipSpaces' :: CharParser st ()
-skipSpaces' = many (char ' ') >> return ()
+skipSpaces' = void $ many (char ' ')
 
 -- | Case and count of spaces insensitive variant of 'string'
 stringCSI :: String -> CharParser st String
-stringCSI pattern =
-  try $ foldl glue (return "") $ map test (unwords $ words pattern)
+stringCSI pattern_ =
+  try $ foldl glue (return "") $ map test (unwords $ words pattern_)
   where test x = if isSpace x
                  then space >> spaces >> return " "
                  else string [toUpper x] <|> string [toLower x]

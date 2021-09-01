@@ -16,6 +16,7 @@ module Dfm (
 
 import Text.Parsec hiding ((<|>), many, optional)
 import Control.Applicative
+import Control.Monad (void)
 import ParsecUtils
 import Debug.Trace
 import Data.Maybe (fromMaybe)
@@ -84,7 +85,7 @@ data PropertyValue =
   deriving (Show)
 
 -- | Representation of single @item@
-data Item = Item {itemProperties :: [PropertyOfObject]}
+newtype Item = Item {itemProperties :: [PropertyOfObject]}
             deriving (Show)
 
 
@@ -97,7 +98,7 @@ traceM' label = return ()
 --   return ()
 
 -- | Options of DFM parsing
-data ParseDfmOpts = ParseDfmOpts {
+newtype ParseDfmOpts = ParseDfmOpts {
     ignoreBinaryDfm :: Bool -- ^ Ignore not text DFM-files
   }
 
@@ -109,7 +110,7 @@ parseDfmFile file opts = do
     then
       if ignoreBinaryDfm opts
         then Right Nothing
-        else Left $ "not text DFM"
+        else Left "not text DFM"
     else
       case parse parseObject file input of
         Left e -> (Left . show) e
@@ -121,7 +122,7 @@ isTextDfm s =
 
 parseObject :: Parser Object
 parseObject = do
-  traceM' $ "parseObject [ "
+  traceM' "parseObject [ "
   skipSpaces'
   objSource <- fromString <$> (string objectS <|> try (string inheritedS) <|> string inlineS)
   char ' '
@@ -167,7 +168,7 @@ parseProperties = do
 parsePropertyOfObject :: Parser PropertyOfObject
 parsePropertyOfObject = do
   traceM' "parsePropertyOfObject ["
-  value <- PropertyO <$> (try parseObject) <|> parseProperty <?> "property of object"
+  value <- PropertyO <$> try parseObject <|> parseProperty <?> "property of object"
   traceM' "parsePropertyOfObject ]"
   return value
 
@@ -198,7 +199,7 @@ parseBoolean = do
 parseInteger :: Parser PropertyValue
 parseInteger = do
   traceM' "parseInteger ["
-  sign <- fromMaybe "" <$> (optional $ string "-")
+  sign <- fromMaybe "" <$> optional (string "-")
   value <- many1 digit
   lookAhead eol
   traceM' "parseInteger ]"
@@ -216,7 +217,7 @@ parseString' =
   optional spaces *> (concat <$> oneLinePart `sepBy1` separator)
     where
       oneLinePart :: Parser String
-      oneLinePart = concat <$> (many1 oneLineChank)
+      oneLinePart = concat <$> many1 oneLineChank
       oneLineChank :: Parser String
       oneLineChank = normalString <|> symbolsString
       normalString :: Parser String
@@ -259,35 +260,35 @@ parseList = do
 parseSet :: Parser PropertyValue
 parseSet = do
   traceM' "parseSet ["
-  value <- fmap PVSet $ between (char '[') (char ']') (many1 (noneOf ",]") `sepBy` string ", ")
+  value <- PVSet <$> between (char '[') (char ']') (many1 (noneOf ",]") `sepBy` string ", ")
   traceM' "parseSet ]"
   return value
 
 parseBinary :: Parser PropertyValue
 parseBinary = do
   traceM' "parseBinary ["
-  value <- PVBinary <$> (between (char '{' >> optional (eol >> spaces)) (char '}') (concat <$> ((many1 hexDigit) `sepBy` spaces)))
+  value <- PVBinary <$> between (char '{' >> optional (eol >> spaces)) (char '}') (concat <$> (many1 hexDigit `sepBy` spaces))
   traceM' "parseBinary ]"
   return value
 
 parseConstant :: Parser PropertyValue
 parseConstant = do
   traceM' "parseConstant ["
-  value <- fmap PVConstant $ notSpaces
+  value <- PVConstant <$> notSpaces
   traceM' "parseConstant ]"
   return value
 
 parseItems :: Parser PropertyValue
 parseItems = do
   traceM' "parseItems ["
-  value <- between (char '<' >> (optional eol)) (char '>') $ many parseItem
+  value <- between (char '<' >> optional eol) (char '>') $ many parseItem
   traceM' "parseItems ]"
   return $ PVItems value
 
 parseItem :: Parser Item
 parseItem = do
   traceM' "parseItem ["
-  value <- Item <$> (between startOfItem endOfItem parseProperties)
+  value <- Item <$> between startOfItem endOfItem parseProperties
   traceM' "parseItem ]"
   return value
     where
@@ -297,7 +298,7 @@ parseItem = do
 endOfItem :: Parser ()
 endOfItem = do
   traceM' "endOfItem ["
-  skipSpaces' >> string "end" >> (eol <|> (lookAhead (char '>') >> return ()))
+  skipSpaces' >> string "end" >> (eol <|> void (lookAhead (char '>')))
   traceM' "endOfItem ]"
   return ()
 
