@@ -30,6 +30,8 @@ executable delphi-lint
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  other-modules:
+                       Paths_delphi_lint
   build-depends:       base
                      , filepath
                      , cmdargs >= 0.10.14
