@@ -12,7 +12,7 @@ import System.Console.CmdArgs
 import System.Environment (getProgName)
 import Control.Monad (unless, forM_)
 import Text.Regex.TDFA
-import Data.Maybe (isNothing, mapMaybe)
+import Data.Either (isLeft, isRight, rights)
 import System.Directory (doesFileExist, doesDirectoryExist)
 
 import Paths_delphi_lint (version)
@@ -75,11 +75,14 @@ makeFileNameRegexM = makeRegexOptsM fileNameCompOpts fileNameExecOpts
 checkOptions :: Flags -> IO ()
 checkOptions opts = do
 
-  let badRegexps = filter (isNothing . snd) $
+  let badRegexps = filter (isLeft . snd) $
                    map (\x -> (x, makeFileNameRegexM x)) $
                        ignore_path_pattern opts
   unless (null badRegexps) $
-         error "Bad regex in --ignore-path-pattern"
+       let firstElem = head badRegexps
+           errMsg = case snd firstElem of
+                      Left x -> x
+       in error $ "Bad regex \"" ++ fst firstElem ++ "\" in --ignore-path-pattern: " ++ errMsg
 
   forM_ (source_path_1 opts : sources_paths opts) $ \path -> do
     b <- (||) <$> doesFileExist path <*> doesDirectoryExist path
@@ -94,7 +97,7 @@ main = do
     ignorePath :: FilePath -> Bool
     ignorePath path =
       any (`matchTest` path) compiledRegexps
-        where compiledRegexps = mapMaybe makeFileNameRegexM $ ignore_path_pattern opts''
+        where compiledRegexps = rights $ map makeFileNameRegexM $ ignore_path_pattern opts''
 
   files <- fmap concat $ mapM (findFiles filterDfmFiles) $ source_path_1 opts'' : sources_paths opts''
   mapM (\f -> (f,) <$> checkDfmFile opts'' f) (filter (not . ignorePath) files) >>= printResults
