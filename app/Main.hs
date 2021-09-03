@@ -17,6 +17,7 @@ import System.Directory (doesFileExist, doesDirectoryExist)
 
 import Paths_delphi_lint (version)
 import Data.Version (showVersion)
+import Data.String (IsString, fromString)
 
 programVersion :: String
 programVersion =
@@ -62,6 +63,9 @@ opts' = getProgName >>= \programName -> return $
              ,programName ++ " Unit1.dfm Unit2.dfm"
              ]
 
+
+instance IsString err => MonadFail (Either err) where
+  fail = Left . fromString
 
 fileNameCompOpts = defaultCompOpt {
                      -- Case insensitive because Delphi is for windows and there file
