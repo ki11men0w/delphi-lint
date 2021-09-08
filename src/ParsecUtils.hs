@@ -24,14 +24,18 @@ module ParsecUtils
   ,ascii
   ,isSqlIdentifierChar
   ,sqlIdentifierChar
+  ,isSqlIdentifierStartChar
+  ,sqlIdentifierStartChar
+  ,dropEndLineSpaces
   )
 where
 
 import Text.Parsec
 import Text.Parsec.String
-import Data.Char (toUpper, toLower, isSpace, isAlphaNum)
+import Data.Char (toUpper, toLower, isSpace, isAlpha, isDigit)
 import Control.Monad (void)
 import Data.Monoid
+import Data.List (dropWhileEnd)
 
 
 type CharParser st = GenParser Char st
@@ -45,8 +49,14 @@ isAscii c = c `elem` " 0123456789qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZX
 ascii :: CharParser st Char
 ascii = satisfy isAscii
 
+isSqlIdentifierStartChar :: Char -> Bool
+isSqlIdentifierStartChar c = isAlpha c || c `elem` "#$@_"
+
+sqlIdentifierStartChar :: CharParser st Char
+sqlIdentifierStartChar = satisfy isSqlIdentifierStartChar
+
 isSqlIdentifierChar :: Char -> Bool
-isSqlIdentifierChar c = isAlphaNum c || c `elem` "#$@_"
+isSqlIdentifierChar c = isSqlIdentifierStartChar c || isDigit c
 
 sqlIdentifierChar :: CharParser st Char
 sqlIdentifierChar = satisfy isSqlIdentifierChar
@@ -129,3 +139,15 @@ notSpace = satisfy (not . isSpace)
 
 notSpaces :: CharParser st [Char]
 notSpaces = many notSpace
+
+dropEndLineSpaces :: String -> String
+dropEndLineSpaces [] = []
+dropEndLineSpaces s =
+  let
+    endEol = last s == '\n'
+    ls = lines s
+    lastLine = last ls
+    initLines' = unlines $ map (dropWhileEnd isSpace) $ init ls
+    lastLine' = if endEol then dropWhileEnd isSpace lastLine ++ "\n" else lastLine
+  in
+    initLines' ++ lastLine'

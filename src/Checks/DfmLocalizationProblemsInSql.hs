@@ -2,17 +2,29 @@
 
 module Checks.DfmLocalizationProblemsInSql
   (
-   checkDfm
+    DfmCheckConfig(..)
+  , checkDfm
   ) where
 
 import Dfm
+import ParsecSql
+import SqlSyntax
 import Control.Monad.Trans.State (State, execState, get, put)
 import Data.List (intercalate)
 import ParsecUtils
-import Text.Parsec hiding ((<|>), many, optional, State)
+import Text.Parsec hiding ((<|>), State)
 import Control.Applicative
 import Data.Char (toLower)
-import Data.Functor (($>))
+import Data.Functor (void)
+import Data.Either (isRight)
+import Control.Monad(guard)
+
+data DfmCheckConfig
+  = DfmCheckConfig
+    { ignoreUnparseableSql :: Bool
+    , ignoreNumericFieldsAmbiguousSize :: Bool
+    , includeSqlInReport :: Bool
+    }
 
 newtype StateData = StateData
   {
@@ -23,24 +35,30 @@ type ProblemReport = String
 
 
 -- | Check DFM for non ASCII symbols in probably SQL's
-checkDfm :: DfmFile -> [ProblemReport]
-checkDfm dfm =
-  messages $ execState (checkObject dfm []) $ StateData []
+checkDfm :: DfmCheckConfig -> DfmFile -> [ProblemReport]
+checkDfm cfg dfm =
+  messages $ execState (checkObject cfg dfm []) $ StateData []
 
 -- | Проверяет объект 'o' и все его дочерние объекты.
 -- Параметр 'parents' содержит ссылки на все родительские объекты
 -- объекта 'o'.
-checkObject :: Object -> [Object] -> State StateData ()
-checkObject o parents = do
+checkObject :: DfmCheckConfig -> Object -> [Object] -> State StateData ()
+checkObject cfg o parents = do
   mapM_ checkProperty $ objectProperties o
    where
-     checkProperty (PropertyO child) = checkObject child (o:parents)
-     checkProperty (PropertyP p@(Property _ (PVString s))) = checkProp (makePropName'''' p o parents) s
-     checkProperty (PropertyP p@(Property _ (PVStrings ss))) = checkProp (makePropName'''' p o parents) $ intercalate "\n" ss
+     checkProperty (PropertyO child) = checkObject cfg child (o:parents)
+     checkProperty (PropertyP p@(Property _ (PVString s))) = checkProp cfg (makePropName'''' p o parents) s
+     checkProperty (PropertyP p@(Property _ (PVStrings ss))) = checkProp cfg (makePropName'''' p o parents) $ intercalate "\n" ss
      checkProperty _ = return ()
 
-checkProp name s =
+checkProp :: DfmCheckConfig -> String -> String -> State StateData ()
+checkProp cfg name s = do
   case checkSqlWithNonAsciiSymbols s of
+    Nothing -> return ()
+    Just msg -> do
+           st <- get
+           put $ st {messages = makeMessage name msg : messages st}
+  case checkSqlWithAmbiguousStringFiledSize cfg s of
     Nothing -> return ()
     Just msg -> do
            st <- get
@@ -78,18 +96,63 @@ checkSqlWithNonAsciiSymbols s =
     where
       filterNonAscii = filter (not .isAscii)
       hasNotAscii = not . all isAscii
-      hasSql :: String -> Bool
-      hasSql s =
-        let parseResult = parse parseHasSql "string property value" $ map toLower s
-        in case parseResult of
-             Left e -> False
-             Right x -> True
 
-parseHasSql :: Parsec String () ()
-parseHasSql =
-  () <$ try sqlMarkerAtBegin <|> () <$ manyTill anyChar sqlMarkerInbetween
+hasSql :: String -> Bool
+hasSql sql =
+  isRight $ parse parseHasSql "may be sql" (toLower <$> sql)
   where
-    notSqlIdentifierChar = satisfy (not . isSqlIdentifierChar)
-    sqlMarker = string "select" <|> string "where" <|> string "from" <|> ((\_ _ -> "") <$> string "order" <* spaces1 <*> string "by") <|> string "update" <|> string "insert" <|> string "begin"
-    sqlMarkerAtBegin = sqlMarker *> notSqlIdentifierChar $> ()
-    sqlMarkerInbetween = between notSqlIdentifierChar notSqlIdentifierChar sqlMarker
+    parseHasSql :: CharParser st ()
+    parseHasSql =
+      void $ (skipSpaces1 >> sqlMarker <|> sqlMarker) >> skipSpaces1
+      where
+        sqlMarker =
+              string "select"
+          <|> string "where"
+          <|> string "from"
+          <|> string "order" >> skipSpaces1 >> string "by"
+          <|> string "update"
+          <|> string "insert"
+          <|> string "begin"
+
+hasSelect :: String -> Bool
+hasSelect sql =
+    isRight $ parse parseHasSelect "may be select" (toLower <$> sql)
+    where
+      parseHasSelect :: CharParser st ()
+      parseHasSelect =
+          void $ ((skipSpaces1 >> string "select") <|> string "select") >> skipSpaces1
+
+checkSqlWithAmbiguousStringFiledSize :: DfmCheckConfig -> String -> Maybe String
+checkSqlWithAmbiguousStringFiledSize cfg sql =
+  if hasSelect sql
+    then
+      case parse findSelects "probably SQL expression with SELECT" sql of
+        Right selects -> findInSelects selects
+        Left err -> if ignoreUnparseableSql cfg
+                      then Nothing
+                      else Just $ "Cannot parse probably SQL expression: " <> show err <> "\n" <> sql
+    else Nothing
+  where
+    findInSelects :: [SqlSelect] -> Maybe String
+    findInSelects selects =
+      let errs = concat $ findInSelect <$> selects
+      in if null errs
+           then Nothing
+           else Just $ "Maybe ambiguous field size because of: " <> intercalate ", " (toSql <$> errs)
+                        <> (if includeSqlInReport cfg then "\n```\n" <> sql <> "\n```" else "")
+
+    findInSelect :: SqlSelect -> [SqlExpression]
+    findInSelect (SqlSelect fields) =
+      concat $ findInExpr . fieldValue <$> fields
+      where
+        findInExpr :: SqlExpression -> [SqlExpression]
+        -- findInExpr x@(SqlEFunction _ args) = concat (findInExpr <$> args)
+        findInExpr x@(SqlENumberLiteral _) = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
+        findInExpr x@(SqlEStringLiteral _) = [x]
+        findInExpr x@(SqlEVariable _) = [x]
+        findInExpr (SqlEParenthesis v) = findInExpr v
+        findInExpr (SqlESelect v) = findInSelect v
+        findInExpr (SqlECase _ wn Nothing) = concat $ findInExpr . snd <$> wn
+        findInExpr (SqlEUnaryOperator _ v) = findInExpr v
+        findInExpr (SqlEBinaryOperator o1 _ o2) = findInExpr o1 <> findInExpr o2
+        findInExpr _ = []

@@ -30,6 +30,9 @@ data Flags = Flags
              sources_paths :: [FilePath],
              ignore_path_pattern :: [String],
              ignore_binary_dfm :: Bool
+           , ignore_unparseable_sql :: Bool
+           , include_sql_in_report :: Bool
+           , ignore_numeric_fields_ambiguous_size :: Bool
            } deriving (Data, Typeable)
 
 opts' :: IO Flags
@@ -51,7 +54,20 @@ opts' = getProgName >>= \programName -> return $
                
           ignore_binary_dfm =
             def
-            &= help "DFM's in binary format are not checked by this utility but a warning is displayed for every DFM in binary format. This option suppress these warnings"
+            &= help "DFM's in binary format are not checked by this utility but a warning is displayed for every DFM in binary format. This option suppress these warnings",
+
+          ignore_unparseable_sql =
+            def
+            &= help "Do not report SQL's that we cannot parse to find potential problems",
+
+          include_sql_in_report =
+            def
+            &= help "Include original SQL in report",
+
+          ignore_numeric_fields_ambiguous_size =
+            def
+            &= help "Do not check ambiguous size of numeric fields"
+
         }
         &= program programName
         &= summary ("Lint for Delphi version " ++ programVersion)
@@ -116,15 +132,18 @@ checkDfmFile opts file = do
   --print parsedDfm
   return $ case parsedDfm of
              Left e -> Left $ show e
-             Right (Just o) -> Right $ E.checkDfm o
+             Right (Just o) -> Right $ E.checkDfm (DfmCheckConfig { ignoreUnparseableSql = ignore_unparseable_sql opts
+                                                                  , includeSqlInReport = include_sql_in_report opts
+                                                                  , ignoreNumericFieldsAmbiguousSize = ignore_numeric_fields_ambiguous_size opts
+                                                                  }) o
              _  -> Right []
 
 
-printResults :: (Show a, Show b) => [(FilePath, Either a [b])] -> IO ()
+printResults :: [(FilePath, Either String [String])] -> IO ()
 printResults =
   mapM_ printOneResult
   where
-    printOneResult (fileName, Left msg) = hPutStrLn stderr $ "Error while parsing file \"" ++ fileName ++ "\": " ++ show msg
+    printOneResult (fileName, Left msg) = hPutStrLn stderr $ "Error while parsing file \"" ++ fileName ++ "\": " <> msg
     printOneResult (_, Right []) = return ()
-    printOneResult (fileName, Right problems) = putStrLn ("\n\nDFM-file \"" ++ fileName ++ "\" has issues:") >> mapM_ (putStrLn . show) problems
+    printOneResult (fileName, Right problems) = putStrLn ("\n\nDFM-file \"" ++ fileName ++ "\" has issues:") >> mapM_ putStrLn problems
   
