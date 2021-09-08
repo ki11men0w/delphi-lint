@@ -39,7 +39,8 @@ dirTreeWithFilter :: FilePath -> IO (DirTree FilePath)
 dirTreeWithFilter rootDir = do
   _:/tree <- readDirectoryWith return rootDir
   return $ filterDir dropGarbage tree
-    where dropGarbage x = isFile x || (isDir x && fileName x /= ".git")
+    where dropGarbage x = isFile x || (isDir x && (not . any (fileName x ==)) vcsDirectories)
+          vcsDirectories = [".git", "_darcs"]
 
 
 findFiles :: (FilePath -> Bool) -> FilePath -> IO [FilePath]
