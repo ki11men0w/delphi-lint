@@ -6,7 +6,7 @@ module Main where
 
 import Lib
 import Dfm
-import Checks.DfmNonAsciiInSql
+import Checks.DfmLocalizationProblemsInSql as E
 import System.IO (stdout, stderr, hPutStrLn)
 import System.Console.CmdArgs
 import System.Environment (getProgName)
@@ -116,7 +116,7 @@ checkDfmFile opts file = do
   --print parsedDfm
   return $ case parsedDfm of
              Left e -> Left $ show e
-             Right (Just o) -> Right $ checkDfmForNonAsciiSymbolsInSql o
+             Right (Just o) -> Right $ E.checkDfm o
              _  -> Right Nothing
 
 

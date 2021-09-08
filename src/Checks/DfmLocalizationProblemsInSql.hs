@@ -1,8 +1,8 @@
 {- -*- coding:utf-8 -*- -}
 
-module Checks.DfmNonAsciiInSql
+module Checks.DfmLocalizationProblemsInSql
   (
-   checkDfmForNonAsciiSymbolsInSql
+   checkDfm
   ) where
 
 import Dfm
@@ -21,8 +21,8 @@ newtype StateData = StateData
 
 
 -- | Check DFM for non ASCII symbols in probably SQL's
-checkDfmForNonAsciiSymbolsInSql :: DfmFile -> Maybe String
-checkDfmForNonAsciiSymbolsInSql dfm =
+checkDfm :: DfmFile -> Maybe String
+checkDfm dfm =
   let msgs = messages $ execState (checkObject dfm []) $ StateData []
   in if null msgs
        then Nothing
@@ -41,8 +41,7 @@ checkObject o parents = do
      checkProperty _ = return ()
 
 checkProp name s =
-  let m = checkSql s
-  in case m of
+  case checkSql s of
     Nothing -> return ()
     Just msg -> do
            st <- get
@@ -72,7 +71,7 @@ makePropName''' object objects =
 
 makePropName'''' :: Property -> Object -> [Object] -> String
 makePropName'''' p o os =
-  makePropName $ propertyName p : objectName o : map objectName os
+  makePropName $ propertyName p : objectName o : (objectName <$> os)
 
 checkSql :: String -> Maybe String
 checkSql s =
@@ -92,6 +91,6 @@ parseHasSql =
   () <$ try sqlMarkerAtBegin <|> () <$ manyTill anyChar sqlMarkerInbetween
   where
     notSqlIdentifierChar = satisfy (not . isSqlIdentifierChar)
-    sqlMarker = string "select" <|> string "where" <|> string "from" <|> ((\_ _ -> "") <$> string "order" <* spaces1 <*> string "by")
+    sqlMarker = string "select" <|> string "where" <|> string "from" <|> ((\_ _ -> "") <$> string "order" <* spaces1 <*> string "by") <|> string "update" <|> string "insert" <|> string "begin"
     sqlMarkerAtBegin = sqlMarker *> notSqlIdentifierChar $> ()
     sqlMarkerInbetween = between notSqlIdentifierChar notSqlIdentifierChar sqlMarker
