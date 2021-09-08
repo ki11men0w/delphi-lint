@@ -110,21 +110,21 @@ main = do
 
 -- | Проверяет указанный dfm-файл и возвращает текст со описанием ошибок, которые
 -- необходимо поправить. Если при обработке файла произошла ошибка, то её текст будет
-checkDfmFile :: Flags -> FilePath -> IO (Either String (Maybe String))
+checkDfmFile :: Flags -> FilePath -> IO (Either String [String])
 checkDfmFile opts file = do
   parsedDfm <- parseDfmFile file (ParseDfmOpts{ignoreBinaryDfm = ignore_binary_dfm opts})
   --print parsedDfm
   return $ case parsedDfm of
              Left e -> Left $ show e
              Right (Just o) -> Right $ E.checkDfm o
-             _  -> Right Nothing
+             _  -> Right []
 
 
-printResults :: [(FilePath, Either String (Maybe String))] -> IO ()
+printResults :: (Show a, Show b) => [(FilePath, Either a [b])] -> IO ()
 printResults =
   mapM_ printOneResult
   where
-    printOneResult (fileName, Left msg) = hPutStrLn stderr $ "Error while parsing file \"" ++ fileName ++ "\": " ++ msg
-    printOneResult (fileName, Right (Just msg)) = putStrLn $ "\n\nDFM-file \"" ++ fileName ++ "\" has issues:\n" ++ msg
-    printOneResult _ = return ()
+    printOneResult (fileName, Left msg) = hPutStrLn stderr $ "Error while parsing file \"" ++ fileName ++ "\": " ++ show msg
+    printOneResult (_, Right []) = return ()
+    printOneResult (fileName, Right problems) = putStrLn ("\n\nDFM-file \"" ++ fileName ++ "\" has issues:") >> mapM_ (putStrLn . show) problems
   

@@ -19,14 +19,13 @@ newtype StateData = StateData
     messages :: [String]
   } deriving (Show)
 
+type ProblemReport = String
+
 
 -- | Check DFM for non ASCII symbols in probably SQL's
-checkDfm :: DfmFile -> Maybe String
+checkDfm :: DfmFile -> [ProblemReport]
 checkDfm dfm =
-  let msgs = messages $ execState (checkObject dfm []) $ StateData []
-  in if null msgs
-       then Nothing
-       else Just $ intercalate "\n" msgs
+  messages $ execState (checkObject dfm []) $ StateData []
 
 -- | Проверяет объект 'o' и все его дочерние объекты.
 -- Параметр 'parents' содержит ссылки на все родительские объекты
@@ -41,7 +40,7 @@ checkObject o parents = do
      checkProperty _ = return ()
 
 checkProp name s =
-  case checkSql s of
+  case checkSqlWithNonAsciiSymbols s of
     Nothing -> return ()
     Just msg -> do
            st <- get
@@ -73,8 +72,8 @@ makePropName'''' :: Property -> Object -> [Object] -> String
 makePropName'''' p o os =
   makePropName $ propertyName p : objectName o : (objectName <$> os)
 
-checkSql :: String -> Maybe String
-checkSql s =
+checkSqlWithNonAsciiSymbols :: String -> Maybe String
+checkSqlWithNonAsciiSymbols s =
   if hasNotAscii s && hasSql s then Just $ "Non ASCII symbols in probably SQL expression: \'" ++ filterNonAscii s ++ "'"  else Nothing
     where
       filterNonAscii = filter (not .isAscii)
