@@ -146,7 +146,18 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
       concat $ findInExpr . fieldValue <$> fields
       where
         findInExpr :: SqlExpression -> [SqlExpression]
-        -- findInExpr x@(SqlEFunction _ args) = concat (findInExpr <$> args)
+        findInExpr x@(SqlEFunction fn args) =
+          case simpleIdentifierName fn of
+            Just "TO_DATE" -> []
+            Just "TO_NUMBER" -> concat $ (findInExpr <$> args)
+            Just "TO_CHAR" -> concat $ (findInExpr <$> args)
+            Just "DECODE" ->
+              -- Берем только аргументы влияющие на тип результата этой функции
+              let nextPair (_:x:xs) = findInExpr x <> nextPair xs
+                  nextPair [x] = findInExpr x
+                  nextPair [] = []
+              in nextPair (tail args)
+            _ -> concat (findInExpr <$> args)
         findInExpr x@(SqlENumberLiteral _) = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
         findInExpr x@(SqlEStringLiteral _) = [x]
         findInExpr x@(SqlEVariable _) = [x]

@@ -6,11 +6,13 @@ module SqlSyntax
   , SqlSingleIdentifier(..)
   , SqlIdentifier(..)
   , SqlExpression(..)
+  , simpleIdentifierName
   )
 where
 
 import Data.Maybe (fromMaybe)
 import Data.List (intercalate)
+import Data.Char (toUpper)
 
 -- | Представляет описание типа. Например: `number`, `varchar2(100)`
 data SqlType
@@ -130,3 +132,10 @@ instance ToSql SqlExpression where
   toSql (SqlEBinaryOperator a1 o a2) = toSql a1 <> " " <> o <> " " <> toSql a2
   toSql (SqlEAny []) = "*"
   toSql (SqlEAny xs) = intercalate "." (toSql <$> xs)  <> ".*"
+
+
+-- | Возвращает имя идентификатора если это простой идентификатор (без префикса)
+simpleIdentifierName :: SqlIdentifier -> Maybe String
+simpleIdentifierName (SqlIdentifier [] (SqlSingleIdentifier a)) = Just (toUpper <$> a)
+simpleIdentifierName (SqlIdentifier [] (SqlSingleIdentifierQuoted a))= Just a
+simpleIdentifierName _ = Nothing
