@@ -19,6 +19,8 @@ library
                      , Dfm
                      , Checks.DfmLocalizationProblemsInSql
                      , ParsecUtils
+                     , ParsecSql
+                     , SqlSyntax
   build-depends:       base >= 4.7 && < 5
                      , filepath
                      , transformers >= 0.4.2.0
