@@ -92,8 +92,8 @@ class ToSql a where
   toSql :: a -> String
 
 instance ToSql SqlType where
-  toSql (SqlTypeVarchar s t)  = "VARCHAR(" <> show s <> fromMaybe "" t <> ")"
-  toSql (SqlTypeVarchar2 s t) = "VARCHAR2(" <> show s <> fromMaybe "" t <> ")"
+  toSql (SqlTypeVarchar s t)  = "VARCHAR(" <> show s <> maybe "" (" " <>) t <> ")"
+  toSql (SqlTypeVarchar2 s t) = "VARCHAR2(" <> show s <> maybe "" (" " <>)  t <> ")"
   toSql (SqlTypeNumber Nothing) = "NUMBER"
   toSql (SqlTypeNumber (Just (s, Nothing))) = "NUMBER(" <> show s <> ")"
   toSql (SqlTypeNumber (Just (s, Just f))) = "NUMBER(" <> show s <> "," <> show f <> ")"
@@ -137,5 +137,5 @@ instance ToSql SqlExpression where
 -- | Возвращает имя идентификатора если это простой идентификатор (без префикса)
 simpleIdentifierName :: SqlIdentifier -> Maybe String
 simpleIdentifierName (SqlIdentifier [] (SqlSingleIdentifier a)) = Just (toUpper <$> a)
-simpleIdentifierName (SqlIdentifier [] (SqlSingleIdentifierQuoted a))= Just a
+simpleIdentifierName (SqlIdentifier [] (SqlSingleIdentifierQuoted a)) = Just a
 simpleIdentifierName _ = Nothing

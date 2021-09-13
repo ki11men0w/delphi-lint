@@ -162,9 +162,9 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
                 [a, _] -> findInExpr a
                 _ -> []
             _ -> concat (findInExpr <$> args)
-        findInExpr x@(SqlENumberLiteral _) = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
-        findInExpr x@(SqlEStringLiteral _) = [x]
-        findInExpr x@(SqlEVariable _) = [x]
+        findInExpr x@(SqlENumberLiteral {}) = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
+        findInExpr x@(SqlEStringLiteral {}) = [x]
+        findInExpr x@(SqlEVariable {}) = [x]
         findInExpr (SqlEParenthesis v) = findInExpr v
         findInExpr (SqlESelect v) = findInSelect v
         findInExpr (SqlECase _ wn Nothing) = concat $ findInExpr . snd <$> wn
