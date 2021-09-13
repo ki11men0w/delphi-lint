@@ -157,6 +157,10 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
                   nextPair [x] = findInExpr x
                   nextPair [] = []
               in nextPair (tail args)
+            Just "ROUND" ->
+              case args of
+                [a, _] -> findInExpr a
+                _ -> []
             _ -> concat (findInExpr <$> args)
         findInExpr x@(SqlENumberLiteral _) = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
         findInExpr x@(SqlEStringLiteral _) = [x]
