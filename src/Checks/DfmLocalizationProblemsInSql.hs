@@ -14,10 +14,9 @@ import Control.Monad.Trans.State (State, execState, get, put)
 import Data.List (intercalate, uncons)
 import Text.Parsec (parse, string)
 import Control.Applicative
-import Data.Char (toLower)
+import Data.Char (toLower, toUpper)
 import Data.Functor (void)
 import Data.Either (isRight)
-import Control.Monad(guard)
 
 data DfmCheckConfig
   = DfmCheckConfig
@@ -129,23 +128,29 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
 
     findInSelect :: SqlSelect -> [SqlExpression]
     findInSelect (SqlSelect fields) =
-      concat $ findInExpr . fieldValue <$> fields
+      concat $ [findInExpr e | e <- fieldValue <$> fields, isNotDate e]
       where
+        checkIfAll es =
+          let errs = findInExpr <$> es
+          in
+            if any null errs
+            then []
+            else concat errs
         findInExpr :: SqlExpression -> [SqlExpression]
-        findInExpr x@(SqlEFunction fn args) =
+        findInExpr (SqlEFunction fn args) =
           let
             checkAllArgs = concat (findInExpr <$> args)
             checkOnlyFirstArgument = maybe [] findInExpr (fst <$> uncons args)
           in case simpleIdentifierName fn of
-            Just "NVL" -> checkOnlyFirstArgument
+            Just "NVL" -> checkIfAll args
             Just "COUNT" -> []
             Just "TO_DATE" -> []
-            Just "TO_NUMBER" -> concat (findInExpr <$> args)
+            Just "TO_NUMBER" -> checkIfAll args
             Just "TO_CHAR" -> concat (findInExpr <$> args)
             Just "DECODE" ->
               -- Берем только аргументы влияющие на тип результата этой функции
-              let nextPair (_:x:xs) = findInExpr x <> nextPair xs
-                  nextPair [x] = findInExpr x
+              let nextPair (_:e:es) = findInExpr e <> nextPair es
+                  nextPair [y] = findInExpr y
                   nextPair [] = []
               in nextPair (tail args)
             Just "ROUND" ->
@@ -156,7 +161,7 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
             Just "TRUNC" ->
               case args of
                 -- для вызовов типа `trunc(sysdate, 'MM') проверяем только первый аргумент
-                [x, SqlEStringLiteral _] -> findInExpr x
+                [e, SqlEStringLiteral _] -> findInExpr e
                 _ -> checkAllArgs
             _ -> checkAllArgs
         findInExpr x@SqlENumberLiteral {} = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
@@ -164,7 +169,28 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
         findInExpr x@SqlEVariable {} = [x]
         findInExpr (SqlEParenthesis v) = findInExpr v
         findInExpr (SqlESelect v) = findInSelect v
-        findInExpr (SqlECase _ wn Nothing) = concat $ findInExpr . snd <$> wn
+        findInExpr (SqlECase _ wn Nothing) = checkIfAll (snd <$> wn)
+        findInExpr (SqlECase _ wn (Just el)) = checkIfAll (el:(snd <$> wn))
         findInExpr (SqlEUnaryOperator _ v) = findInExpr v
-        findInExpr (SqlEBinaryOperator o1 _ o2) = findInExpr o1 <> findInExpr o2
+        findInExpr (SqlEBinaryOperator o1 _ o2) = checkIfAll [o1,o2]
         findInExpr _ = []
+
+        isNotDate = not . isDate
+        isDate :: SqlExpression -> Bool
+        isDate (SqlEFunction fn args) =
+          case simpleIdentifierName fn of
+            Just "SYSDATE" -> True
+            Just "TO_DATE" -> True
+            Just "ADD_MONTHS" -> True
+            Just "TRUNC" ->
+              case args of
+                [_, SqlEStringLiteral s] ->
+                  (toUpper <$> s) `elem` ["Y", "MM", "D", "HH", "MI", "YYYY"]
+                _ -> False
+            _ -> any isDate args
+        isDate (SqlEIdentifier i)
+          | simpleIdentifierName i == Just "SYSDATE" = True
+          | otherwise = False
+        isDate (SqlECase _ wn Nothing) = any isDate (snd <$> wn)
+        isDate (SqlECase _ wn (Just el)) = any isDate (el:(snd <$> wn))
+        isDate _ = False
