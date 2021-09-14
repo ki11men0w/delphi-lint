@@ -11,7 +11,7 @@ import ParsecUtils
 import ParsecSql
 import SqlSyntax
 import Control.Monad.Trans.State (State, execState, get, put)
-import Data.List (intercalate)
+import Data.List (intercalate, uncons)
 import Text.Parsec (parse, string)
 import Control.Applicative
 import Data.Char (toLower)
@@ -148,10 +148,11 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
         findInExpr :: SqlExpression -> [SqlExpression]
         findInExpr x@(SqlEFunction fn args) =
           case simpleIdentifierName fn of
+            Just "NVL" -> maybe [] findInExpr (fst <$> uncons args)
             Just "COUNT" -> []
             Just "TO_DATE" -> []
-            Just "TO_NUMBER" -> concat $ (findInExpr <$> args)
-            Just "TO_CHAR" -> concat $ (findInExpr <$> args)
+            Just "TO_NUMBER" -> concat (findInExpr <$> args)
+            Just "TO_CHAR" -> concat (findInExpr <$> args)
             Just "DECODE" ->
               -- Берем только аргументы влияющие на тип результата этой функции
               let nextPair (_:x:xs) = findInExpr x <> nextPair xs
