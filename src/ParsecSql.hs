@@ -9,9 +9,9 @@ import ParsecUtils
 import SqlSyntax
 import Text.Parsec hiding ((<|>), many, optional, State, string)
 import Control.Applicative
-import Data.Char (toLower, isSpace)
+import Data.Char (isSpace)
 import Data.List (dropWhileEnd)
-import Data.Functor (($>), void)
+import Data.Functor (void)
 import Data.Maybe (fromMaybe)
 
 string = stringCSI
@@ -151,6 +151,8 @@ sqlFunction = do
   skipSpaces
   char ')'
   skipSpaces
+  optional $ string "over" >> skipSpaces >> skipParenthesis "(" ")" skipSpaces
+  skipSpaces
   return $ SqlEFunction name args
 
 sqlNumberLiteral :: CharParser st SqlExpression
@@ -244,7 +246,7 @@ sqlTypeNumber = do
 
 sqlTypeAny :: CharParser st SqlType
 sqlTypeAny =
-  SqlTypeAny <$> many1 (noneOf "()")
+  SqlTypeAny . concat <$> many1 (skipParenthesis "(" ")" skipSpaces <|> (concat <$> (many1 ((<>) <$> ((:[]) <$> noneOf "()") <*> skipSpaces))))
 
 skipTillSqlExpressionEnd :: CharParser st [Char]
 skipTillSqlExpressionEnd = do

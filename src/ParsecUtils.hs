@@ -27,6 +27,7 @@ module ParsecUtils
   ,isSqlIdentifierStartChar
   ,sqlIdentifierStartChar
   ,dropEndLineSpaces
+  ,skipParenthesis
   )
 where
 
@@ -34,7 +35,6 @@ import Text.Parsec
 import Text.Parsec.String
 import Data.Char (toUpper, toLower, isSpace, isAlpha, isDigit)
 import Control.Monad (void)
-import Data.Monoid
 import Data.List (dropWhileEnd)
 
 
@@ -84,7 +84,7 @@ restOfLine = manyTill anyChar eol
 restOfLine' :: CharParser st String
 restOfLine' = manyTill anyChar (lookAhead (eof <|> eol))
 
-
+anyLine :: CharParser st [Char]
 anyLine = restOfLine
 
 -- | Ищет следующее вхождение комбинатора переданного в кчестве аргумента. Возвращает то что вернул
@@ -152,3 +152,10 @@ dropEndLineSpaces s =
     lastLine' = if endEol then dropWhileEnd isSpace lastLine ++ "\n" else lastLine
   in
     initLines' ++ lastLine'
+
+skipParenthesis :: String -> String -> CharParser st [Char] -> CharParser st [Char]
+skipParenthesis openP closeP skipSpaces = do
+  s1 <- string openP <* skipSpaces
+  s2 <- concat <$> many ((<>) <$> (skipParenthesis openP closeP skipSpaces <|> (notFollowedBy (string closeP) *> ((:[]) <$> anyChar))) <*> skipSpaces)
+  s3 <- string closeP <* skipSpaces
+  return $ s1 <> s2 <> s3
