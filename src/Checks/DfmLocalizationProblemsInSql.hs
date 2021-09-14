@@ -65,26 +65,12 @@ checkProp cfg name s = do
            put $ st {messages = makeMessage name msg : messages st}
 
 
-
+makeMessage :: String -> String -> String
 makeMessage propName errMsg =
   "Property \"" ++ propName ++ "\": \"" ++ errMsg ++ "\""
 
 makePropName :: [String] -> String
 makePropName names = intercalate "." $ reverse names
-
-makePropName' :: String -> [String] -> String
-makePropName' name names =
-  let names' = name : names
-  in intercalate "." $ reverse names'
-
-makePropName'' :: [Object] -> String
-makePropName'' objects =
-  let names = map objectName objects
-  in makePropName names
-
-makePropName''' :: Object -> [Object] -> String
-makePropName''' object objects =
-  makePropName' (objectName object) (map objectName objects)
 
 makePropName'''' :: Property -> Object -> [Object] -> String
 makePropName'''' p o os =
