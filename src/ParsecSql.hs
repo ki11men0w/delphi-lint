@@ -9,9 +9,9 @@ import ParsecUtils
 import SqlSyntax
 import Text.Parsec hiding ((<|>), many, optional, State, string)
 import Control.Applicative
-import Data.Char (toLower, isSpace)
+import Data.Char (isSpace)
 import Data.List (dropWhileEnd)
-import Data.Functor (($>), void)
+import Data.Functor (void)
 import Data.Maybe (fromMaybe)
 
 string = stringCSI

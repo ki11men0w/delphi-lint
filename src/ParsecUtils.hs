@@ -34,7 +34,6 @@ import Text.Parsec
 import Text.Parsec.String
 import Data.Char (toUpper, toLower, isSpace, isAlpha, isDigit)
 import Control.Monad (void)
-import Data.Monoid
 import Data.List (dropWhileEnd)
 
 
@@ -84,7 +83,7 @@ restOfLine = manyTill anyChar eol
 restOfLine' :: CharParser st String
 restOfLine' = manyTill anyChar (lookAhead (eof <|> eol))
 
-
+anyLine :: CharParser st [Char]
 anyLine = restOfLine
 
 -- | Ищет следующее вхождение комбинатора переданного в кчестве аргумента. Возвращает то что вернул
