@@ -27,6 +27,7 @@ module ParsecUtils
   ,isSqlIdentifierStartChar
   ,sqlIdentifierStartChar
   ,dropEndLineSpaces
+  ,skipParenthesis
   )
 where
 
@@ -151,3 +152,10 @@ dropEndLineSpaces s =
     lastLine' = if endEol then dropWhileEnd isSpace lastLine ++ "\n" else lastLine
   in
     initLines' ++ lastLine'
+
+skipParenthesis :: String -> String -> CharParser st [Char] -> CharParser st [Char]
+skipParenthesis openP closeP skipSpaces = do
+  s1 <- string openP <* skipSpaces
+  s2 <- concat <$> many ((<>) <$> (skipParenthesis openP closeP skipSpaces <|> (notFollowedBy (string closeP) *> ((:[]) <$> anyChar))) <*> skipSpaces)
+  s3 <- string closeP <* skipSpaces
+  return $ s1 <> s2 <> s3
