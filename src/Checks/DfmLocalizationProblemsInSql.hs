@@ -148,6 +148,7 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
         findInExpr :: SqlExpression -> [SqlExpression]
         findInExpr x@(SqlEFunction fn args) =
           case simpleIdentifierName fn of
+            Just "COUNT" -> []
             Just "TO_DATE" -> []
             Just "TO_NUMBER" -> concat $ (findInExpr <$> args)
             Just "TO_CHAR" -> concat $ (findInExpr <$> args)
