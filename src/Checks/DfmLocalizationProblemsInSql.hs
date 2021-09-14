@@ -163,6 +163,7 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
                 -- для вызовов типа `trunc(sysdate, 'MM') проверяем только первый аргумент
                 [e, SqlEStringLiteral _] -> findInExpr e
                 _ -> checkAllArgs
+            Just "SUBSTR" -> checkOnlyFirstArgument
             _ -> checkAllArgs
         findInExpr x@SqlENumberLiteral {} = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
         findInExpr x@SqlEStringLiteral {} = [x]
