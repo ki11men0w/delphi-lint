@@ -123,7 +123,8 @@ stringCSI pattern_ =
   try $ foldl glue (return "") $ map test (unwords $ words pattern_)
   where test x = if isSpace x
                  then space >> spaces >> return " "
-                 else string [toUpper x] <|> string [toLower x]
+                 else (string [toUpper x] <|> string [toLower x])
+                        <?> ("char '" <> [x] <> "' in string \"" <> pattern_ <> "\"")
         glue x y = do
           s1 <- x
           s2 <- y
