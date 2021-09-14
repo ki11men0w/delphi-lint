@@ -63,7 +63,7 @@ checkProp cfg name s = do
     Just msg -> do
            st <- get
            put $ st {messages = makeMessage name msg : messages st}
-           
+
 
 
 makeMessage propName errMsg =
@@ -147,8 +147,11 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
       where
         findInExpr :: SqlExpression -> [SqlExpression]
         findInExpr x@(SqlEFunction fn args) =
-          case simpleIdentifierName fn of
-            Just "NVL" -> maybe [] findInExpr (fst <$> uncons args)
+          let
+            checkAllArgs = concat (findInExpr <$> args)
+            checkOnlyFirstArgument = maybe [] findInExpr (fst <$> uncons args)
+          in case simpleIdentifierName fn of
+            Just "NVL" -> checkOnlyFirstArgument
             Just "COUNT" -> []
             Just "TO_DATE" -> []
             Just "TO_NUMBER" -> concat (findInExpr <$> args)
@@ -163,7 +166,13 @@ checkSqlWithAmbiguousStringFiledSize cfg sql =
               case args of
                 [a, _] -> findInExpr a
                 _ -> []
-            _ -> concat (findInExpr <$> args)
+            Just "ADD_MONTHS" -> checkOnlyFirstArgument
+            Just "TRUNC" ->
+              case args of
+                -- для вызовов типа `trunc(sysdate, 'MM') проверяем только первый аргумент
+                [x, SqlEStringLiteral _] -> findInExpr x
+                _ -> checkAllArgs
+            _ -> checkAllArgs
         findInExpr x@SqlENumberLiteral {} = [x  | not $ ignoreNumericFieldsAmbiguousSize cfg]
         findInExpr x@SqlEStringLiteral {} = [x]
         findInExpr x@SqlEVariable {} = [x]
