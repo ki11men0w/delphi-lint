@@ -122,7 +122,7 @@ sqlUnquotedIdentifierS exclusions = do
 sqlSingleIdentifierWithExclusions :: [String] -> CharParser st SqlSingleIdentifier
 sqlSingleIdentifierWithExclusions exclusions =
   (
-    SqlSingleIdentifierQuoted <$> (char '"' *> sqlUnquotedIdentifierS [] <* char '"')
+    SqlSingleIdentifierQuoted <$> (char '"' *> many (noneOf "\"") <* char '"')
     <|>
     SqlSingleIdentifier <$> sqlUnquotedIdentifierS exclusions
   ) <* skipSpaces
