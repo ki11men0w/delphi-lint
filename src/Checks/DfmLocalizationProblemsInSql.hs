@@ -63,7 +63,7 @@ checkProp cfg name s = do
     Just msg -> do
            st <- get
            put $ st {messages = makeMessage name msg : messages st}
-           
+
 
 
 makeMessage propName errMsg =
