@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 {- -*- coding:utf-8 -*- -}
 
 module Dfm (
